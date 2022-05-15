@@ -40,6 +40,9 @@ char vegmid[5][24] = {
 char vegsmall[3][24] = {
 	"Оливки", "Пряные корнишоны", "Свежая зелень"
 };
+char pizzanames[5][13] = {
+	"Классическая", "Диабло", "Аррива", "Супермясная", "Карбонара"
+};
 
 // Структура для цен
 struct costs
@@ -75,12 +78,19 @@ struct new_fill
 	int seasonings;
 };
 
+union name
+{
+	char name[MAX_NAMES_LEN];
+	int numbername;
+};
+
 struct new_pizza
 {
 	int size;
 	char sizename[MAX_NAMES_LEN];
 	struct new_base base;
 	struct new_fill fill;
+	union name pizzaname;
 } pizza;
 
 int security(char input[MAX_DIGIT_INPUT])
@@ -167,7 +177,7 @@ int security_file(char* filename)
 			}
 			else if (i == 10)
 			{
-				if (str[0] != 0) flag = 0;
+				//if (str[0] != 0) flag = 0;
 			}
 			memset(str, 0, sizeof(str));
 		}
@@ -386,6 +396,66 @@ void add_seas()
 	}
 }
 
+void check_name()
+{
+	printf("Введите номер желаемого названия пиццы: ");
+	char input[MAX_DIGIT_INPUT];
+	fgets(input, MAX_DIGIT_INPUT, stdin);
+	fseek(stdin, 0, SEEK_END);
+	if (security(input) == 0 && atoi(input) > 0 && atoi(input) < 6)
+	{
+		pizza.pizzaname.numbername = atoi(input);
+		printf("\n* Вы выбрали название для пиццы - %s *\n\n", pizzanames[pizza.pizzaname.numbername - 1]);
+	}
+	else
+	{
+		printf("Вы некорректно ввели номер пункта. Попробуйте ещё раз!\n");
+		check_name();
+	}
+}
+
+void input_name()
+{
+	printf("Введите название пиццы: ");
+	char str[MAX_NAMES_LEN];
+	fgets(str, MAX_NAMES_LEN, stdin);
+	fseek(stdin, 0, SEEK_END);
+	str[strcspn(str, "\n")] = 0;
+	if (strlen(str) < 2)
+	{
+		printf("Вы некорректно ввели название пиццы. Попробуйте ещё раз!\n");
+		input_name();
+	}
+	else strcpy(pizza.pizzaname.name, str);
+}
+
+void add_name()
+{
+	printf("1. Задать название пиццы вручную.\n"
+		"2. Выбрать готовое название пиццы.\n"
+		"Введите номер желаемого пункта: ");
+	char input[MAX_DIGIT_INPUT];
+	fgets(input, MAX_DIGIT_INPUT, stdin);
+	fseek(stdin, 0, SEEK_END);
+	if (security(input) == 0 && atoi(input) == 1)
+	{
+		printf("\nМинимальная длина названия пиццы - 2 символа, максимальная длина - 32 символа\n");
+		input_name();
+		printf("\n* Вы выбрали название для пиццы - %s *\n\n", pizza.pizzaname.name);
+	}
+	else if (security(input) == 0 && atoi(input) == 2)
+	{
+		printf("\nГотовые имена пицц:\n");
+		for (int i = 0; i < 5; i++) printf("%d. \"%s\"\n", i + 1, pizzanames[i]);
+		check_name();
+	}
+	else
+	{
+		printf("Вы некорректно ввели номер пункта. Попробуйте ещё раз!\n");
+		add_name();
+	}
+}
+
 // Создание новой пиццы
 void create_new()
 {
@@ -472,6 +542,10 @@ void create_new()
 	for (int i = 0; i < 3; i++) printf("%d. %s - %d руб.\n", i + 1, seas[i], costs.seascost[i]);
 	add_seas();
 	
+	printf("Также, необходимо задать имя вашей пиццы.\n"
+		"Вы можете задать название самостоятельно, а также выбрать из уже готовых имён.\n");
+	add_name();
+
 	printf("Ваша пицца успешно создана!\n\n");
 	exit_menu();
 }
@@ -480,6 +554,13 @@ void create_new()
 void print_pizza()
 {
 	printf("Текущая пицца:\n\n");
+	int flag = 0;
+	for (int i = 1; i < 6; i++)
+	{
+		if (pizza.pizzaname.numbername == i) flag = i;
+	}
+	if (flag != 0) printf("Название пиццы: \"%s\"\n", pizzanames[flag - 1]);
+	else printf("Название пиццы: \"%s\"\n", pizza.pizzaname.name);
 	printf("1. Тесто для пиццы: %d) %s - %d руб.\n", pizza.size, pizza.sizename, costs.sizecost[pizza.size - 1]);
 	printf("2. Соус: %d) %s - %d руб.\n", pizza.base.sauce, pizza.base.saucename, costs.saucecost[pizza.base.sauce - 1]);
 	printf("3. Сыр: %d) %s - %d руб.\n", pizza.base.cheese, pizza.base.cheesename, costs.cheesecost[pizza.base.cheese - 1]);
@@ -568,6 +649,13 @@ void save_pizza()
 		}
 		fprintf(file, "\n");
 		fprintf(file, "%d\n", pizza.fill.seasonings);
+		int flag = 0;
+		for (int i = 1; i < 6; i++)
+		{
+			if (pizza.pizzaname.numbername == i) flag = i;
+		}
+		if (flag != 0) fprintf(file, "%d\n", flag);
+		else fprintf(file, "%s\n", pizza.pizzaname.name);
 		fclose(file);
 		system("cls");
 		printf("Ваша пицца успешно сохранена в файл '%s'!\n\n", str);
@@ -604,7 +692,7 @@ void open_pizza()
 	{
 		FILE* file = fopen(input, "r");
 		char str[32];
-		for (int i = 1; i < 10; i++)
+		for (int i = 1; i < 11; i++)
 		{
 			fgets(str, sizeof(str), file);
 			str[strcspn(str, "\n")] = 0;
@@ -632,6 +720,16 @@ void open_pizza()
 				for (int j = 0; j < strlen(str); j++) pizza.fill.meat[(str[j] - '0') - 1] = 1;
 			}
 			else if (i == 9) pizza.fill.seasonings = atoi(str);
+			else if (i == 10)
+			{
+				int flag = 0;
+				for (int i = 1; i < 6; i++)
+				{
+					if (atoi(str) == i && str[1] == 0) flag = i;
+				}
+				if (flag == 0) strcpy(pizza.pizzaname.name, str);
+				else pizza.pizzaname.numbername = flag;
+			}
 			memset(str, 0, sizeof(str));
 		}
 		fclose(file);
